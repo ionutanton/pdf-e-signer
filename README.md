@@ -3,6 +3,8 @@
 O aplicație desktop modernă și intuitivă pentru semnarea electronică în bloc (batch) a documentelor PDF folosind token-uri hardware (HSM/USB cu PKCS#11).
 Aplicația permite încărcarea și previzualizarea documentelor, definirea chenarului de semnătură pe o pagină specifică prin drag-and-drop și aplicarea unei semnături electronice calificate pentru mai multe documente simultan.
 
+![PDF e-Sign Capture](pdf-e-sign-capture.jpg)
+
 ## 🌟 Funcționalități Principale
 
 - **Încărcare multiplă:** Adaugă documente PDF prin Drag & Drop sau din file explorer.
