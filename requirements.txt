@@ -1,0 +1,6 @@
+Pillow
+PyMuPDF
+tkinterdnd2
+PyKCS11
+endesive
+cryptography

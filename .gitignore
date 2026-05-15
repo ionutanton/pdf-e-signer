@@ -1,0 +1,25 @@
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Logs
+*.log
+app_debug.log
+
+# App specific
+signature_settings.json
+Semnate/
+
+# Virtual environment
+python_env/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
