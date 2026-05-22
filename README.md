@@ -22,7 +22,7 @@ Aplicația permite încărcarea și previzualizarea documentelor, definirea chen
 
 Aplicația folosește un mediu Python portabil preconfigurat (`python_env`), așadar **nu este necesar să instalezi Python manual în sistemul tău**.
 
-**[📥 Descarcă Aplicația (v1.0 .zip)](https://github.com/ionutanton/pdf-e-signer/releases/download/v1.0/pdf-e-sign-v1.0.zip)**
+**[📥 Descarcă Aplicația (v1.01 .zip)](https://github.com/ionutanton/pdf-e-signer/releases/download/v1.01/pdf-e-sign-v1.01.zip)**
 
 1. Descarcă și extrage arhiva în calculatorul tău.
 2. Rulează fișierul **`install.bat`** (cu dublu click). Acesta va folosi automat Python-ul portabil pentru a descărca și instala pachetele necesare.
