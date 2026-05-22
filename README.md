@@ -11,26 +11,36 @@ Aplicația permite încărcarea și previzualizarea documentelor, definirea chen
 - **Previzualizare și Navigare:** Vizualizare rapidă a fiecărui PDF. Dacă are mai multe pagini, poți folosi scroll, navigația cu butoane sau sări direct la o pagină anume.
 - **Poziționare Vizuală (Drag to Select):** Poziționează exact locul unde va apărea semnătura vizibilă desenând un dreptunghi cu mouse-ul.
 - **Ștergere dinamică:** Elimină oricând din listă fișierele introduse din greșeală, eliberând totodată memoria poziției setate anterior.
-- **Suport Multi-Token PKCS#11:** Detectare automată și integrare nativă cu majoritatea furnizorilor de semnătură din România (CertSign, DigiSign, AlfaSign, CertDigital, etc.).
+- **Suport Multi-Token PKCS#11:** Detectare automată și integrare nativă cu majoritatea furnizorilor de semnătură din România (CertSign, DigiSign, AlfaSign, CertDigital, etc.) pentru Windows și Linux.
 - **Aspect 100% Personalizabil:** Controlează formatul semnăturii tale aparente (Nume, Motiv, Locație, Dată), mărimea fontului, culori, grosimea conturului și chiar inserarea unui logo propriu. Setările de personalizare beneficiază de previzualizare Live.
 - **Semnare în Bloc (Batch Sign):** După ce trasezi chenarele pe rând pentru toate PDF-urile, introduci un singur PIN, iar aplicația le va semna electronic pe toate pe rând.
 - **Gestionare clară a erorilor:** În caz de protecție cu parolă, document corupt, sau eroare la conectarea tokenului USB, aplicația continuă și la final prezintă un raport clar al documentelor eșuate.
 
 ## 🚀 Instalare și Configurare
 
+### Pentru utilizatorii Windows 🪟
+
 Aplicația folosește un mediu Python portabil preconfigurat (`python_env`), așadar **nu este necesar să instalezi Python manual în sistemul tău**.
 
 **[📥 Descarcă Aplicația (v1.0 .zip)](https://github.com/ionutanton/pdf-e-signer/releases/download/v1.0/pdf-e-sign-v1.0.zip)**
 
 1. Descarcă și extrage arhiva în calculatorul tău.
-2. Rulează fișierul **`install.bat`** (cu dublu click). Acesta va folosi automat Python-ul portabil pentru a instala pachetele necesare (din `requirements.txt`).
+2. Rulează fișierul **`install.bat`** (cu dublu click). Acesta va folosi automat Python-ul portabil pentru a descărca și instala pachetele necesare.
+
+### Pentru utilizatorii Linux 🐧 (Ubuntu/Debian)
+
+*Mulțumiri speciale lui **Dan Stoian** pentru colaborare la dezvoltarea și testarea suportului pentru Linux!*
+
+1. Clonează sau descarcă proiectul.
+2. Oferă drepturi de execuție scripturilor: `chmod +x install.sh pdf-e-sign.sh`
+3. Rulează scriptul de instalare în terminal: `./install.sh`. Acest script va descărca pachetele de sistem necesare (`python3-venv`, `python3-tk`) și va crea un mediu virtual izolat (`python_env`) unde se vor instala dependențele.
 
 ## 🛠️ Utilizare
 
-Pentru a rula aplicația, este suficient să deschizi:
-**`pdf-e-sign.bat`** (dublu click).
+**Pentru Windows:** Rulează **`pdf-e-sign.bat`** (dublu click).
+**Pentru Linux:** Rulează **`./pdf-e-sign.sh`** în terminal.
 
-*(Acest script lansează aplicația folosind automat mediul portabil izolat)*
+*(Aceste scripturi lansează aplicația folosind automat mediul izolat preconfigurat)*
 
 ### Fluxul de Semnare:
 1. Trage PDF-urile în fereastră.

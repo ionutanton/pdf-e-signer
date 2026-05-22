@@ -1,5 +1,8 @@
 @echo off
+:: Fortam terminalul sa foloseasca folderul curent (repara problema Run as Administrator)
+cd /d "%~dp0"
 chcp 65001 >nul
+
 echo =======================================
 echo Setare Mediu Python (Portabil) - Semnatura Digitala PDF Pro
 echo =======================================
@@ -27,7 +30,7 @@ echo.
 echo [INFO] Extragere arhiva... ^(va rugam asteptati, poate dura putin^)
 rem Curatam fisierele temporare daca a mai rulat inainte
 if exist .\wp_temp rmdir /s /q .\wp_temp
-powershell -command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '.\wp_temp' -Force"
+powershell -ExecutionPolicy Bypass -command "Expand-Archive -Path '%ZIP_FILE%' -DestinationPath '.\wp_temp' -Force"
 
 echo.
 echo [INFO] Cautare motor Python in arhiva extrasa...
@@ -73,7 +76,7 @@ echo 2. Actualizare pip ^(folosind Python portabil^)...
 
 echo.
 echo 3. Instalare librarii necesare pentru aplicatie...
-".\%PYTHON_DIR%\python.exe" -m pip install -r requirements.txt
+".\%PYTHON_DIR%\python.exe" -m pip install Pillow PyMuPDF tkinterdnd2 PyKCS11 endesive cryptography attrs
 
 echo.
 echo =======================================

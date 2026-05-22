@@ -6,6 +6,7 @@ import logging
 import datetime
 import traceback
 import json
+import platform
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Tuple
@@ -17,6 +18,9 @@ import PyKCS11
 from endesive.pdf import cms
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+
+# --- PLATFORMĂ ---
+IS_WINDOWS = platform.system() == "Windows"
 
 # --- CONFIGURARE LOGGING ---
 logger = logging.getLogger()
@@ -60,16 +64,32 @@ DEFAULT_SETTINGS = {
     "image_path": ""
 }
 
-# --- PROFILURI DRIVERE PKCS#11 ROMÂNIA ---
-DLL_PRESETS = {
-    "Alfasign / SafeNet (eToken.dll)": r"C:\Windows\System32\eToken.dll",
-    "DigiSign / SafeNet (eToken.dll)": r"C:\Windows\System32\eToken.dll",
-    "DigiSign / ePass2003 (eps2003csp11.dll)": r"C:\Windows\System32\eps2003csp11.dll",
-    "certSIGN / Athena (acpkcs211.dll)": r"C:\Windows\System32\acpkcs211.dll",
-    "certSIGN / Bit4Id (bit4xpki.dll)": r"C:\Windows\System32\bit4xpki.dll",
-    "certSIGN / Oberthur (OcsCryptoki.dll)": r"C:\Windows\System32\OcsCryptoki.dll",
-    "CertDigital / Bit4Id (bit4xpki.dll)": r"C:\Windows\System32\bit4xpki.dll"
-}
+# --- PROFILURI DRIVERE PKCS#11 ---
+if IS_WINDOWS:
+    DLL_PRESETS = {
+        "Alfasign / SafeNet (eToken.dll)": r"C:\Windows\System32\eToken.dll",
+        "DigiSign / SafeNet (eToken.dll)": r"C:\Windows\System32\eToken.dll",
+        "DigiSign / ePass2003 (eps2003csp11.dll)": r"C:\Windows\System32\eps2003csp11.dll",
+        "certSign / SafeNet (eToken.dll)": r"C:\Windows\System32\eToken.dll",
+        "certSIGN / Athena (acpkcs211.dll)": r"C:\Windows\System32\acpkcs211.dll",
+        "certSIGN / Bit4Id (bit4xpki.dll)": r"C:\Windows\System32\bit4xpki.dll",
+        "certSIGN / Oberthur (OcsCryptoki.dll)": r"C:\Windows\System32\OcsCryptoki.dll",
+        "CertDigital / Bit4Id (bit4xpki.dll)": r"C:\Windows\System32\bit4xpki.dll"
+    }
+    DEFAULT_DLL = "Alfasign / SafeNet (eToken.dll)"
+else:
+    # Linux / Ubuntu
+    DLL_PRESETS = {
+        "Alfasign / SafeNet (libeToken.so)":       "/usr/lib/libeToken.so",
+        "DigiSign / SafeNet (libeToken.so)":        "/usr/lib/libeToken.so",
+        "DigiSign / ePass2003 (libepsng_p11.so)":   "/usr/lib/libepsng_p11.so",
+        "certSIGN / Athena (libacpkcs211.so)":      "/usr/lib/libacpkcs211.so",
+        "certSIGN / Bit4Id (libbit4xpki.so)":       "/usr/lib/libbit4xpki.so",
+        "certSIGN / Oberthur (libocscryptoki.so)":  "/usr/lib/libocscryptoki.so",
+        "CertDigital / Bit4Id (libbit4xpki.so)":    "/usr/lib/libbit4xpki.so",
+        "OpenSC (opensc-pkcs11.so)":                "/usr/lib/x86_64-linux-gnu/opensc-pkcs11.so",
+    }
+    DEFAULT_DLL = "Alfasign / SafeNet (libeToken.so)"
 
 def hex_to_rgb(hex_str):
     hex_str = hex_str.lstrip('#')
@@ -82,7 +102,7 @@ class HardwareTokenHSM:
     @staticmethod
     def list_all_certificates(dll_path):
         if not os.path.exists(dll_path):
-            raise FileNotFoundError(f"Fișierul driver DLL nu a fost găsit la: {dll_path}")
+            raise FileNotFoundError(f"Fișierul driver nu a fost găsit la: {dll_path}")
 
         pkcs11 = PyKCS11.PyKCS11Lib()
         try:
@@ -201,13 +221,18 @@ class FileListWidget(tk.Frame):
         super().__init__(parent, *args, **kwargs)
         self.app = app
         
-        self.canvas = tk.Canvas(self, bg="#1a1a2e", bd=0, highlightthickness=0, height=140)
+        self.canvas = tk.Canvas(self, bg="#1a1a2e", bd=0, highlightthickness=0, height=220)
         self.scrollbar = ttk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
         self.scrollable_frame = tk.Frame(self.canvas, bg="#1a1a2e")
         
-        self.scrollable_frame.bind("<Configure>", lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all")))
+        self.scrollable_frame.bind("<Configure>", self._on_frame_configure)
         self.canvas_window = self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
         self.canvas.bind('<Configure>', self._on_canvas_configure)
+
+        # mousewheel scrolling
+        self.canvas.bind("<Button-4>", lambda e: self.canvas.yview_scroll(-1, "units"))
+        self.canvas.bind("<Button-5>", lambda e: self.canvas.yview_scroll(1, "units"))
+        self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
         
         self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
@@ -216,8 +241,15 @@ class FileListWidget(tk.Frame):
         self.items = []
         self.selected_idx = -1
 
+    def _on_frame_configure(self, event=None):
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+
     def _on_canvas_configure(self, event):
         self.canvas.itemconfig(self.canvas_window, width=event.width)
+
+    def _update_scroll(self):
+        self.scrollable_frame.update_idletasks()
+        self.canvas.configure(scrollregion=self.canvas.bbox("all"))
 
     def insert(self, idx, text):
         if idx == "end":
@@ -230,9 +262,16 @@ class FileListWidget(tk.Frame):
 
         lbl = tk.Label(f, text=text, bg="#1a1a2e", fg="#eaeaea", anchor="w", cursor="hand2")
         lbl.pack(side="left", fill="x", expand=True, padx=5, pady=2)
+
+        # mousewheel on each item row too
+        for widget in (f, lbl, btn):
+            widget.bind("<Button-4>", lambda e: self.canvas.yview_scroll(-1, "units"))
+            widget.bind("<Button-5>", lambda e: self.canvas.yview_scroll(1, "units"))
+            widget.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
         
         self.items.insert(idx, {"frame": f, "label": lbl, "button": btn})
         self._repack()
+        self.after(10, self._update_scroll)
 
     def _repack(self):
         for i, item in enumerate(self.items):
@@ -257,6 +296,8 @@ class FileListWidget(tk.Frame):
             else:
                 item["frame"].config(bg="#1a1a2e")
                 item["label"].config(bg="#1a1a2e")
+
+        self.after(10, self._update_scroll)
 
     def select_idx(self, idx):
         self.selected_idx = idx
@@ -301,7 +342,7 @@ class PDFSignerApp(TkinterDnD.Tk):
         self.total_pages = 0
         
         self.pin_var = tk.StringVar()
-        self.dll_combo_var = tk.StringVar(value="Alfasign / SafeNet (eToken.dll)")
+        self.dll_combo_var = tk.StringVar(value=DEFAULT_DLL)
         self.progress_val = tk.DoubleVar(value=0.0)
         self.cert_mapping = {}
         
@@ -338,8 +379,12 @@ class PDFSignerApp(TkinterDnD.Tk):
         return DLL_PRESETS.get(user_val, user_val)
 
     def _browse_dll(self):
-        """Permite utilizatorului să caute un fișier .dll manual în calculator"""
-        file = filedialog.askopenfilename(filetypes=[("Fișiere DLL", "*.dll"), ("Toate fișierele", "*.*")])
+        """Permite utilizatorului să caute un fișier driver manual în calculator"""
+        if IS_WINDOWS:
+            filetypes = [("Fișiere DLL", "*.dll"), ("Toate fișierele", "*.*")]
+        else:
+            filetypes = [("PKCS#11 Driver Linux", "*.so *.so.*"), ("Toate fișierele", "*.*")]
+        file = filedialog.askopenfilename(filetypes=filetypes)
         if file:
             self.dll_combo_var.set(file)
 
@@ -385,13 +430,16 @@ class PDFSignerApp(TkinterDnD.Tk):
 
         tk.Label(self.sidebar, text="② CONECTARE TOKEN USB", font=("Segoe UI", 10, "bold"), bg="#16213e", fg="#e94560").pack(anchor="w", padx=15, pady=(10,0))
         
-        tk.Label(self.sidebar, text="Furnizor / Driver (DLL):", font=("Segoe UI", 8), bg="#16213e", fg="#8892a4").pack(anchor="w", padx=15, pady=(5,0))
+        tk.Label(self.sidebar, text="Furnizor / Driver:" if IS_WINDOWS else "Furnizor / Driver (.so):", font=("Segoe UI", 8), bg="#16213e", fg="#8892a4").pack(anchor="w", padx=15, pady=(5,0))
         
         f_dll = tk.Frame(self.sidebar, bg="#16213e")
         f_dll.pack(fill="x", padx=15, pady=(0, 5))
         
-        # Combobox cu Presetări DLL
-        self.dll_combo = ttk.Combobox(f_dll, textvariable=self.dll_combo_var, values=list(DLL_PRESETS.keys()))
+        # OptionMenu (inlocuieste ttk.Combobox care cauzeaza segfault pe Ubuntu)
+        self.dll_combo = tk.OptionMenu(f_dll, self.dll_combo_var, *list(DLL_PRESETS.keys()))
+        self.dll_combo.config(bg="#1a1a2e", fg="#eaeaea", activebackground="#0f3460",
+                              activeforeground="#eaeaea", highlightthickness=0, bd=0, anchor="w")
+        self.dll_combo["menu"].config(bg="#1a1a2e", fg="#eaeaea")
         self.dll_combo.pack(side="left", fill="x", expand=True, padx=(0, 5))
         tk.Button(f_dll, text="📂", command=self._browse_dll, bg="#0f3460", fg="#eaeaea", bd=0, width=3, cursor="hand2").pack(side="right")
 
@@ -400,8 +448,11 @@ class PDFSignerApp(TkinterDnD.Tk):
         tk.Button(f_action, text="🔍 CITEȘTE CERTIFICATE (FĂRĂ PIN)", command=self._list_token_certs, bg="#0f3460", fg="#eaeaea", font=("Segoe UI", 8, "bold"), bd=0, pady=5, cursor="hand2").pack(fill="x")
 
         tk.Label(self.sidebar, text="Certificat Găsit:", font=("Segoe UI", 8, "bold"), bg="#16213e", fg="#eaeaea").pack(anchor="w", padx=15)
-        self.cert_combo_var = tk.StringVar()
-        self.cert_combo = ttk.Combobox(self.sidebar, textvariable=self.cert_combo_var, state="readonly")
+        self.cert_combo_var = tk.StringVar(value="")
+        self.cert_combo = tk.OptionMenu(self.sidebar, self.cert_combo_var, "")
+        self.cert_combo.config(bg="#1a1a2e", fg="#eaeaea", activebackground="#0f3460",
+                               activeforeground="#eaeaea", highlightthickness=0, bd=0, anchor="w")
+        self.cert_combo["menu"].config(bg="#1a1a2e", fg="#eaeaea")
         self.cert_combo.pack(fill="x", padx=15, pady=(0,10))
 
         tk.Label(self.sidebar, text="PIN Token:", font=("Segoe UI", 9, "bold"), bg="#16213e", fg="#eaeaea").pack(anchor="w", padx=15)
@@ -453,23 +504,24 @@ class PDFSignerApp(TkinterDnD.Tk):
 
     def _list_token_certs(self):
         dll_path = self._get_active_dll_path()
-        self.cert_combo.set("Caut pe porturile USB...")
+        self.cert_combo_var.set("Caut pe porturile USB...")
         
         def fetch():
             try:
                 certs = HardwareTokenHSM.list_all_certificates(dll_path)
                 self.after(0, lambda: self._update_cert_dropdown(certs))
             except Exception as e:
-                self.after(0, lambda err=str(e): messagebox.showerror("Eroare Driver/Hardware", f"Verifică dacă driver-ul DLL e corect și token-ul e în PC.\n\nDetalii: {err}"))
-                self.after(0, lambda: self.cert_combo.set(""))
+                self.after(0, lambda err=str(e): messagebox.showerror("Eroare Driver/Hardware", f"Verifică dacă driver-ul DLL/SO e corect și token-ul e în PC.\n\nDetalii: {err}"))
+                self.after(0, lambda: self.cert_combo_var.set(""))
 
         threading.Thread(target=fetch, daemon=True).start()
 
     def _update_cert_dropdown(self, certs):
         self.cert_mapping.clear()
+        menu = self.cert_combo["menu"]
+        menu.delete(0, "end")
         if not certs:
-            self.cert_combo.set("")
-            self.cert_combo['values'] = []
+            self.cert_combo_var.set("")
             messagebox.showwarning("Atenție", "Nu a fost găsit niciun certificat pe token-urile conectate.")
             return
 
@@ -477,11 +529,12 @@ class PDFSignerApp(TkinterDnD.Tk):
             hex_id = bytes(c['cka_id']).hex()[:6].upper()
             display_name = f"{c['cn']} ({c['token_label']}) [{hex_id}]"
             self.cert_mapping[display_name] = {'slot': c['slot'], 'cka_id': c['cka_id']}
-        
-        self.cert_combo['values'] = list(self.cert_mapping.keys())
-        self.cert_combo.current(0)
 
-    # --- GUI SETĂRI ASPECT (Neschimbat, funcționează perfect) ---
+        for name in self.cert_mapping.keys():
+            menu.add_command(label=name, command=lambda v=name: self.cert_combo_var.set(v))
+        self.cert_combo_var.set(list(self.cert_mapping.keys())[0])
+
+    # --- GUI SETĂRI ASPECT ---
     def _open_settings_dialog(self):
         diag = tk.Toplevel(self)
         diag.title("Personalizare Semnătură")
@@ -571,7 +624,10 @@ class PDFSignerApp(TkinterDnD.Tk):
         tk.Label(t2, text="Mărime Text (Font):", bg="#1a1a2e", fg="#eaeaea").grid(row=4, column=0, sticky="w")
         tk.Spinbox(t2, from_=4, to=36, textvariable=v_fontsize, width=10).grid(row=4, column=1, sticky="w", pady=2)
         tk.Label(t2, text="Aliniere Text:", bg="#1a1a2e", fg="#eaeaea").grid(row=5, column=0, sticky="w")
-        cb_align = ttk.Combobox(t2, textvariable=v_textalign, values=["left", "center", "right"], width=10, state="readonly")
+        cb_align = tk.OptionMenu(t2, v_textalign, "left", "center", "right")
+        cb_align.config(bg="#1a1a2e", fg="#eaeaea", activebackground="#0f3460",
+                        activeforeground="#eaeaea", highlightthickness=0, bd=0)
+        cb_align["menu"].config(bg="#1a1a2e", fg="#eaeaea")
         cb_align.grid(row=5, column=1, sticky="w", pady=2)
 
         t3 = tk.Frame(notebook, bg="#1a1a2e", padx=15, pady=15)
@@ -917,7 +973,10 @@ class PDFSignerApp(TkinterDnD.Tk):
                 try:
                     f = f.decode('utf-8')
                 except UnicodeDecodeError:
-                    f = f.decode('mbcs')
+                    if IS_WINDOWS:
+                        f = f.decode('mbcs')
+                    else:
+                        f = f.decode('latin-1')
             if f.lower().endswith('.pdf'):
                 if f not in self.pdf_paths:
                     self.pdf_paths.append(f)
@@ -977,8 +1036,8 @@ class PDFSignerApp(TkinterDnD.Tk):
         self.pdf_paths, self.tasks = [], []
         self.listb.delete(0, "end")
         self.canvas.delete("all")
-        self.cert_combo.set("")
-        self.cert_combo['values'] = []
+        self.cert_combo_var.set("")
+        self.cert_combo["menu"].delete(0, "end")
         self.current_idx = -1
         self.current_page = 0
         self.total_pages = 0
