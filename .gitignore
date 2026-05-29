@@ -9,6 +9,7 @@ app_debug.log
 # App specific
 signature_settings.json
 Semnate/
+tst/
 
 # Virtual environment
 python_env/

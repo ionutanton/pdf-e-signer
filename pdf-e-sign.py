@@ -24,7 +24,7 @@ IS_WINDOWS = platform.system() == "Windows"
 
 # --- CONFIGURARE LOGGING ---
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 
 if logger.hasHandlers():
@@ -190,6 +190,8 @@ class HardwareTokenHSM:
                 keyid, data, algo = args
             else:
                 data, algo = args[0], args[1]
+                
+            logging.debug(f"Hardware token sign called. Algo={algo}, Data length={len(data)} bytes")
 
             if algo == 'sha256':
                 mech = PyKCS11.Mechanism(PyKCS11.CKM_SHA256_RSA_PKCS, None)
@@ -721,16 +723,60 @@ class PDFSignerApp(TkinterDnD.Tk):
 
     # --- EXECUȚIE SEMNARE ---
     def _execute_sign(self, task: SigningTask, hsm: HardwareTokenHSM):
+        logging.debug(f"Executing sign for PDF={task.pdf_path}, Page={task.page_index}, Box={task.box}")
         input_path = os.path.normpath(task.pdf_path)
         output_dir = os.path.join(os.path.dirname(input_path), "Semnate")
         if not os.path.exists(output_dir): 
             os.makedirs(output_dir)
         output_path = os.path.join(output_dir, f"{Path(input_path).stem}_semnat.pdf")
 
-        x1, y1, x2, y2 = task.box
-        w = abs(x2 - x1)
-        h = abs(y2 - y1)
+        ui_x1, ui_y1, ui_x2, ui_y2 = task.box
+        
+        temp_doc = fitz.open(input_path)
+        temp_page = temp_doc.load_page(task.page_index)
+        
+        box_v = fitz.Rect(ui_x1, ui_y1, ui_x2, ui_y2)
+        
+        # 1. Calculăm geometria în SPAȚIUL VIZUAL (unde x/y merg perfect cu UI-ul)
+        bg_r, bg_g, bg_b = hex_to_rgb(self.settings["bg_color"])
+        out_r, out_g, out_b = hex_to_rgb(self.settings["outline_color"])
+        bg_color = (bg_r, bg_g, bg_b)
+        border_color = (out_r, out_g, out_b)
+        
+        img_offset_w = 0
+        pad = 4
+        img_rect_v = None
+        if self.settings.get("use_image") and os.path.exists(self.settings.get("image_path")):
+            img_rect_v = fitz.Rect(box_v.x0 + pad, box_v.y0 + pad, box_v.x0 + box_v.width / 2 - pad, box_v.y1 - pad)
+            img_offset_w = box_v.width / 2
 
+        text_rect_v = fitz.Rect(box_v.x0 + img_offset_w + 2, box_v.y0 + 2, box_v.x1 - 2, box_v.y1 - 2)
+
+        # 2. Transformăm totul în SPAȚIUL UNROTATED (Neserotit) intern al PyMuPDF
+        derot = temp_page.derotation_matrix
+        rotation = temp_page.rotation
+        
+        border_rect = box_v * derot
+        img_rect = img_rect_v * derot if img_rect_v else None
+        text_rect = text_rect_v * derot
+
+        # 3. Desenăm folosind parametrul rotate pentru a compensa rotația viewer-ului
+        temp_page.draw_rect(border_rect, color=border_color, fill=bg_color, width=self.settings["border"])
+        
+        if img_rect:
+            try:
+                temp_page.insert_image(img_rect, filename=self.settings["image_path"], keep_proportion=True, rotate=rotation)
+            except Exception as e:
+                logging.warning(f"Nu s-a putut procesa imaginea: {e}")
+
+        fs = self.settings["fontsize"]
+        align_str = self.settings["textalign"]
+        align = fitz.TEXT_ALIGN_LEFT
+        if align_str == "center":
+            align = fitz.TEXT_ALIGN_CENTER
+        elif align_str == "right":
+            align = fitz.TEXT_ALIGN_RIGHT
+            
         raw_date = datetime.datetime.now(datetime.timezone.utc).strftime("D:%Y%m%d%H%M%S+00'00'")
         viz_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -751,82 +797,44 @@ class PDFSignerApp(TkinterDnD.Tk):
         if self.settings["display_contact"]: lines.append(cln(self.settings["lbl_contact"]) + self.settings["contact"])
         
         text_str = "\n".join(lines)
+        
+        temp_page.insert_textbox(text_rect, text_str, fontsize=fs, color=border_color, align=align, rotate=rotation)
 
-        bg_r, bg_g, bg_b = hex_to_rgb(self.settings["bg_color"])
-        out_r, out_g, out_b = hex_to_rgb(self.settings["outline_color"])
-        fs = self.settings["fontsize"]
-        align = self.settings["textalign"]
+        # Salvăm modificările vizuale în memorie
+        datau = temp_doc.tobytes()
+        
+        # Calculăm poziția matematică a câmpului criptografic invizibil
+        box_user = box_v * temp_page.derotation_matrix * (~temp_page.transformation_matrix)
+        signaturebox = (box_user.x0, box_user.y0, box_user.x1, box_user.y1)
+        temp_doc.close()
 
-        sig_manual = [
-            ['fill_colour', bg_r, bg_g, bg_b],
-            ['rect_fill', 0, 0, w, h],
-            ['stroke_colour', out_r, out_g, out_b],
-            ['border', self.settings["border"]],
-        ]
-
-        img_offset_w = 0
-        manual_images = {}
-
-        if self.settings.get("use_image") and os.path.exists(self.settings.get("image_path")):
-            try:
-                with Image.open(self.settings["image_path"]) as tmp_img:
-                    iw, ih = tmp_img.size
-                
-                pad = 4
-                avail_h = h - (pad * 2)
-                avail_w = int(avail_h * (iw / ih))
-                
-                sig_manual.append(['image', 'sig0', pad, pad, avail_w, avail_h])
-                manual_images['sig0'] = self.settings["image_path"]
-                img_offset_w = avail_w + pad
-            except Exception as e:
-                logging.warning(f"Nu s-a putut procesa imaginea: {e}")
-
-        sig_manual.extend([
-            ['fill_colour', out_r, out_g, out_b],
-            ['font', 'default', fs],
-        ])
-
-        text_x = 2 + img_offset_w
-        text_y = 2
-        text_w = w - text_x - 2
-        text_h = h - 4
-
-        sig_manual.append(['text_box', text_str, 'default', text_x, text_y, text_w, text_h, fs, True, align, 'top'])
-
+        # 2. GENERĂM SEMNĂTURA CRIPTOGRAFICĂ CU ASPECT INVIZIBIL
         dct = {
             "aligned": 0,
             "sigflags": 3,
             "sigflagsft": 132,
             "sigpage": task.page_index,
             "auto_sigfield": True,
-            "signaturebox": (x1, y1, x2, y2),
+            "signaturebox": signaturebox,
             "signform": False,
             "contact": self.settings["contact"],
             "location": self.settings["location"],
             "signingdate": raw_date,   
             "reason": self.settings["reason"],
-            "signature_manual": sig_manual
+            # Lăsăm endesive să facă doar widget-ul transparent, desenul real a fost făcut mai sus!
+            "signature_manual": []
         }
-        
-        if manual_images:
-            dct["manual_images"] = manual_images
 
-        try:
-            doc = fitz.open(input_path)
-            datau = doc.tobytes()
-            doc.close()
-        except:
-            with open(input_path, 'rb') as f:
-                datau = f.read()
-
+        logging.debug(f"Signing dictionary (dct) parameters: {dct}")
         datas = cms.sign(datau, dct, None, cert_obj, (), 'sha256', hsm=hsm)
+        logging.debug(f"Signature generated for {input_path}")
 
         with open(output_path, 'wb') as f:
             f.write(datau)
             f.write(datas)
 
     def _run_batch(self, pin, dll_path, target_slot, target_cka_id):
+        logging.debug(f"Running batch sign. Total tasks: {len(self.tasks)}, DLL: {dll_path}, Slot: {target_slot}, CKA_ID: {target_cka_id}")
         total = len(self.tasks)
         hsm = None
         try:
@@ -912,6 +920,7 @@ class PDFSignerApp(TkinterDnD.Tk):
             self.current_page = min(max(0, page_num), self.total_pages - 1)
             page = doc.load_page(self.current_page)
             self._page_pdf_size = (page.rect.width, page.rect.height)
+            logging.debug(f"Loaded PDF preview: path={path}, page={self.current_page + 1}/{self.total_pages}, page_size={self._page_pdf_size}")
             pix = page.get_pixmap()
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
@@ -928,12 +937,11 @@ class PDFSignerApp(TkinterDnD.Tk):
             for t in self.tasks:
                 if t.pdf_path == path and t.page_index == self.current_page:
                     ox, oy, sc = self._img_offset[0], self._img_offset[1], self._img_scale
-                    pw, ph = self._page_pdf_size
                     x1, y1, x2, y2 = t.box
                     cx1 = x1 * sc + ox
-                    cy1 = (ph - y2) * sc + oy
+                    cy1 = y1 * sc + oy
                     cx2 = x2 * sc + ox
-                    cy2 = (ph - y1) * sc + oy
+                    cy2 = y2 * sc + oy
                     self.canvas.create_rectangle(cx1, cy1, cx2, cy2, outline="#e94560", width=2, tags="sig_rect")
                     break
         except Exception as e:
@@ -1008,11 +1016,14 @@ class PDFSignerApp(TkinterDnD.Tk):
 
     def _on_mouse_release(self, e):
         if getattr(self, '_drag_start', None) and self.current_idx != -1:
+            logging.debug(f"Mouse released. Windows space rectangle: start=({self._drag_start[0]}, {self._drag_start[1]}), end=({e.x}, {e.y})")
             ox, oy, sc = self._img_offset[0], self._img_offset[1], self._img_scale
             pw, ph = self._page_pdf_size
             rx1, ry1 = (min(self._drag_start[0], e.x) - ox) / sc, (min(self._drag_start[1], e.y) - oy) / sc
             rx2, ry2 = (max(self._drag_start[0], e.x) - ox) / sc, (max(self._drag_start[1], e.y) - oy) / sc
-            box = (int(rx1), int(ph - ry2), int(rx2), int(ph - ry1))
+            
+            box = (int(rx1), int(ry1), int(rx2), int(ry2))
+            logging.debug(f"Computed visual space rectangle: {box}")
             self._set_task(self.current_idx, box)
             self._drag_start = None
 
