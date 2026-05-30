@@ -24,6 +24,7 @@ Logging extensiv: A fost integrat un sistem detaliat de loguri (jurnal de evenim
 
 🛠️ Corecții (Bug Fixes)
 Poziționarea semnăturilor: A fost corectată o problemă de aliniere și rotație. Selecția cu mouse-ul se aplică acum cu precizie exactă pe document, indiferent de orientarea sau rotația originală a PDF-ului.
+Optimizare install.bat sa functioneze si cand sunt restrictii de sistem.
 
 ## 🚀 Instalare și Configurare
 

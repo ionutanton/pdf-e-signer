@@ -18,7 +18,7 @@ echo [INFO] Folderul python_env nu exista. Incepem descarcarea automata WinPytho
 echo Aceasta operatiune poate dura cateva minute in functie de viteza de internet.
 echo.
 
-curl -L -o "%ZIP_FILE%" "%URL%"
+curl --ssl-no-revoke -L -o "%ZIP_FILE%" "%URL%"
 
 IF NOT EXIST "%ZIP_FILE%" (
     echo [EROARE] Descarcarea a esuat. Verificati conexiunea la internet sau link-ul.
