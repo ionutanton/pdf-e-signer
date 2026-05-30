@@ -236,8 +236,8 @@ class FileListWidget(tk.Frame):
         self.canvas.bind("<Button-5>", lambda e: self.canvas.yview_scroll(1, "units"))
         self.canvas.bind("<MouseWheel>", lambda e: self.canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
         
-        self.canvas.pack(side="left", fill="both", expand=True)
         self.scrollbar.pack(side="right", fill="y")
+        self.canvas.pack(side="left", fill="both", expand=True)
         self.canvas.configure(yscrollcommand=self.scrollbar.set)
         
         self.items = []
@@ -359,15 +359,19 @@ class PDFSignerApp(TkinterDnD.Tk):
         logging.info("Aplicația UI a pornit cu succes.")
 
     def _load_settings(self):
+        logging.info("Citire setări semnătură din fișier (sau inițializare cu default).")
         if os.path.exists(SETTINGS_FILE):
             try:
                 with open(SETTINGS_FILE, 'r', encoding='utf-8') as f:
-                    return {**DEFAULT_SETTINGS, **json.load(f)}
+                    loaded_settings = json.load(f)
+                    logging.info(f"Setări încărcate cu succes: {loaded_settings}")
+                    return {**DEFAULT_SETTINGS, **loaded_settings}
             except Exception as e:
                 logging.error(f"Eroare la citirea JSON: {e}")
         return DEFAULT_SETTINGS.copy()
 
     def _save_settings(self, new_settings):
+        logging.info(f"Salvare setări semnătură în fișier: {new_settings}")
         self.settings = new_settings
         try:
             with open(SETTINGS_FILE, 'w', encoding='utf-8') as f:
@@ -382,12 +386,14 @@ class PDFSignerApp(TkinterDnD.Tk):
 
     def _browse_dll(self):
         """Permite utilizatorului să caute un fișier driver manual în calculator"""
+        logging.info("Buton apăsat: _browse_dll (Căutare driver manual)")
         if IS_WINDOWS:
             filetypes = [("Fișiere DLL", "*.dll"), ("Toate fișierele", "*.*")]
         else:
             filetypes = [("PKCS#11 Driver Linux", "*.so *.so.*"), ("Toate fișierele", "*.*")]
         file = filedialog.askopenfilename(filetypes=filetypes)
         if file:
+            logging.info(f"S-a selectat fișierul driver: {file}")
             self.dll_combo_var.set(file)
 
     def _build_ui(self):
@@ -396,6 +402,7 @@ class PDFSignerApp(TkinterDnD.Tk):
         tk.Label(top, text="✦ SEMNĂTURĂ DIGITALĂ PDF PRO", font=("Segoe UI", 16, "bold"), bg="#0f3460", fg="#eaeaea").pack(side="left", padx=20)
 
         def open_support_link():
+            logging.info("Buton apăsat: open_support_link (Susține proiectul)")
             import webbrowser
             webbrowser.open("https://buymeacoffee.com/ionutanton")
 
@@ -505,14 +512,18 @@ class PDFSignerApp(TkinterDnD.Tk):
                 self._page_next()
 
     def _list_token_certs(self):
+        logging.info("Buton apăsat: _list_token_certs (Căutare certificate pe token)")
         dll_path = self._get_active_dll_path()
+        logging.info(f"Se caută certificate folosind driver-ul: {dll_path}")
         self.cert_combo_var.set("Caut pe porturile USB...")
         
         def fetch():
             try:
                 certs = HardwareTokenHSM.list_all_certificates(dll_path)
+                logging.info(f"S-au găsit {len(certs)} certificate pe token.")
                 self.after(0, lambda: self._update_cert_dropdown(certs))
             except Exception as e:
+                logging.error(f"Eroare apărută în timpul căutării token-ului: {e}", exc_info=True)
                 self.after(0, lambda err=str(e): messagebox.showerror("Eroare Driver/Hardware", f"Verifică dacă driver-ul DLL/SO e corect și token-ul e în PC.\n\nDetalii: {err}"))
                 self.after(0, lambda: self.cert_combo_var.set(""))
 
@@ -538,6 +549,7 @@ class PDFSignerApp(TkinterDnD.Tk):
 
     # --- GUI SETĂRI ASPECT ---
     def _open_settings_dialog(self):
+        logging.info("Buton apăsat: _open_settings_dialog (Setări aspect semnătură)")
         diag = tk.Toplevel(self)
         diag.title("Personalizare Semnătură")
         diag.geometry("900x550")
@@ -573,11 +585,15 @@ class PDFSignerApp(TkinterDnD.Tk):
         v_img_path = tk.StringVar(value=self.settings.get("image_path", ""))
 
         def choose_color(var):
+            logging.info("Buton apăsat: choose_color (Alege culoare)")
             color = colorchooser.askcolor(initialcolor=var.get(), title="Alege Culoare")
-            if color[1]: var.set(color[1])
+            if color[1]:
+                logging.info(f"Culoare aleasă: {color[1]}")
+                var.set(color[1])
             update_preview()
 
         def save():
+            logging.info("Buton apăsat: save (Salvează setări)")
             new_s = {
                 "contact": v_contact.get(), "location": v_location.get(), "reason": v_reason.get(),
                 "border": v_border.get(), "bg_color": v_bg.get(), "outline_color": v_out.get(),
@@ -652,8 +668,11 @@ class PDFSignerApp(TkinterDnD.Tk):
         f_img.pack(fill="x", pady=5)
         tk.Entry(f_img, textvariable=v_img_path).pack(side="left", fill="x", expand=True, padx=(0, 5))
         def browse_img():
+            logging.info("Buton apăsat: browse_img (Alege imagine)")
             p = filedialog.askopenfilename(filetypes=[("Imagini", "*.png *.jpg *.jpeg")])
-            if p: v_img_path.set(p)
+            if p:
+                logging.info(f"Imagine selectată: {p}")
+                v_img_path.set(p)
             update_preview()
         tk.Button(f_img, text="📂 Alege...", command=browse_img, bg="#0f3460", fg="white", bd=0, padx=10).pack(side="right")
 
@@ -866,6 +885,7 @@ class PDFSignerApp(TkinterDnD.Tk):
             self.after(0, lambda: self.btn_sign.config(state="normal"))
 
     def _start_batch(self):
+        logging.info("Buton apăsat: _start_batch (Aplică semnătură batch)")
         if not self.tasks:
             messagebox.showwarning("Incomplet", "Adaugă PDF-uri și desenează chenarul de semnătură.")
             return
@@ -892,18 +912,23 @@ class PDFSignerApp(TkinterDnD.Tk):
         self.page_label.config(text=f"/ {self.total_pages}")
 
     def _page_first(self):
+        logging.info("Buton apăsat: _page_first (Prima pagină)")
         if self.current_idx != -1: self._load_pdf_preview(self.current_idx, 0)
 
     def _page_prev(self):
+        logging.info("Buton apăsat: _page_prev (Pagina anterioară)")
         if self.current_idx != -1 and self.current_page > 0: self._load_pdf_preview(self.current_idx, self.current_page - 1)
 
     def _page_next(self):
+        logging.info("Buton apăsat: _page_next (Pagina următoare)")
         if self.current_idx != -1 and self.current_page < self.total_pages - 1: self._load_pdf_preview(self.current_idx, self.current_page + 1)
 
     def _page_last(self):
+        logging.info("Buton apăsat: _page_last (Ultima pagină)")
         if self.current_idx != -1: self._load_pdf_preview(self.current_idx, self.total_pages - 1)
 
     def _page_goto(self, event=None):
+        logging.info("Buton apăsat/Eveniment: _page_goto (Mergi la pagina specificată)")
         if self.current_idx != -1:
             try:
                 p = int(self.page_entry_var.get()) - 1
@@ -948,8 +973,10 @@ class PDFSignerApp(TkinterDnD.Tk):
             logging.error(f"Eroare _load_pdf_preview: {e}")
 
     def _delete_pdf(self, idx):
+        logging.info(f"Buton apăsat: _delete_pdf (Șterge PDF de la indexul {idx})")
         if idx < 0 or idx >= len(self.pdf_paths): return
         path = self.pdf_paths[idx]
+        logging.info(f"Se elimină fișierul: {path}")
         self.pdf_paths.pop(idx)
         self.tasks = [t for t in self.tasks if t.pdf_path != path]
         
@@ -967,8 +994,10 @@ class PDFSignerApp(TkinterDnD.Tk):
                 self._load_pdf_preview(self.current_idx)
 
     def _add_pdfs(self):
+        logging.info("Buton apăsat: _add_pdfs (Adaugă documente PDF)")
         files = filedialog.askopenfilenames(filetypes=[("PDF", "*.pdf")])
         for f in files:
+            logging.info(f"Fișier adăugat la listă: {f}")
             if f not in self.pdf_paths:
                 self.pdf_paths.append(f); self.listb.insert("end", os.path.basename(f))
         if self.pdf_paths: self._load_pdf_preview(0)
@@ -994,6 +1023,7 @@ class PDFSignerApp(TkinterDnD.Tk):
             self._load_pdf_preview(0)
 
     def _on_list_select(self, e):
+        logging.info("Eveniment: _on_list_select (S-a selectat un fișier din listă)")
         sel = self.listb.curselection()
         if sel: 
             idx = sel[0]
@@ -1029,12 +1059,15 @@ class PDFSignerApp(TkinterDnD.Tk):
 
     def _set_task(self, idx, box):
         path = self.pdf_paths[idx]
+        logging.info(f"Se setează chenarul vizual al semnăturii în UI pentru {path} pe pagina {self.current_page} la cutia {box}")
         for t in self.tasks:
             if t.pdf_path == path: 
                 t.box = box
                 t.page_index = self.current_page
+                logging.info("Task de semnare actualizat pentru acest fișier.")
                 return
         self.tasks.append(SigningTask(path, self.current_page, box))
+        logging.info("Task de semnare nou creat pentru acest fișier.")
 
     def _update_ui_list(self, path, char):
         try:
@@ -1044,6 +1077,7 @@ class PDFSignerApp(TkinterDnD.Tk):
         except: pass
 
     def _clear_all(self):
+        logging.info("Buton apăsat: _clear_all (Golește toate documentele)")
         self.pdf_paths, self.tasks = [], []
         self.listb.delete(0, "end")
         self.canvas.delete("all")

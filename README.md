@@ -16,13 +16,22 @@ Aplicația permite încărcarea și previzualizarea documentelor, definirea chen
 - **Semnare în Bloc (Batch Sign):** După ce trasezi chenarele pe rând pentru toate PDF-urile, introduci un singur PIN, iar aplicația le va semna electronic pe toate pe rând.
 - **Gestionare clară a erorilor:** În caz de protecție cu parolă, document corupt, sau eroare la conectarea tokenului USB, aplicația continuă și la final prezintă un raport clar al documentelor eșuate.
 
+## Release v1.02
+
+✨ Noutăți (New Features)
+Scrollbar: A fost adăugat un scrollbar pentru o navigare mult mai ușoară în interfață.
+Logging extensiv: A fost integrat un sistem detaliat de loguri (jurnal de evenimente) care facilitează diagnosticarea rapidă a oricăror probleme de rulare.
+
+🛠️ Corecții (Bug Fixes)
+Poziționarea semnăturilor: A fost corectată o problemă de aliniere și rotație. Selecția cu mouse-ul se aplică acum cu precizie exactă pe document, indiferent de orientarea sau rotația originală a PDF-ului.
+
 ## 🚀 Instalare și Configurare
 
 ### Pentru utilizatorii Windows 🪟
 
 Aplicația folosește un mediu Python portabil preconfigurat (`python_env`), așadar **nu este necesar să instalezi Python manual în sistemul tău**.
 
-**[📥 Descarcă Aplicația (v1.01 .zip)](https://github.com/ionutanton/pdf-e-signer/releases/download/v1.01/pdf-e-sign-v1.01.zip)**
+**[📥 Descarcă Aplicația (v1.02 .zip)](https://github.com/ionutanton/pdf-e-signer/releases/download/v1.02/pdf-e-sign-v1.02.zip)**
 
 1. Descarcă și extrage arhiva în calculatorul tău.
 2. Rulează fișierul **`install.bat`** (cu dublu click). Acesta va folosi automat Python-ul portabil pentru a descărca și instala pachetele necesare.

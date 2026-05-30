@@ -25,3 +25,4 @@ venv.bak/
 *.swp
 *.swo
 *.zip
+make_release.bat
